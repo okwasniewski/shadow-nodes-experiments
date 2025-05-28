@@ -1,24 +1,30 @@
-import { useRef } from 'react';
-import { Text, View, StyleSheet, Button } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, StyleSheet, Button, TextInput, Alert } from 'react-native';
 import { multiply } from 'react-native-shadow-nodes-experiments';
 
-import ReactNativeInterface from 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface';
+// @ts-ignore
+import { getNodeFromPublicInstance } from 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface';
 
-const result = multiply(3, 7);
+multiply(2, 3);
 
 export default function App() {
   const textRef = useRef(null);
+  const [text, setText] = useState('Hello World');
   return (
     <View style={styles.container}>
-      <Text ref={textRef}>Result: {result}</Text>
+      <TextInput
+        multiline
+        ref={textRef}
+        defaultValue={text}
+        onChangeText={setText}
+      />
       <Button
-        title="Click me"
+        title="Measure Text Input"
         onPress={() => {
-          const shadowNode = ReactNativeInterface.getNodeFromPublicInstance(
-            textRef.current
-          );
-          // @ts-ignore
-          globalThis.__testFunc(shadowNode);
+          const shadowNode = getNodeFromPublicInstance(textRef.current);
+          // @ts-ignore JSI Exposed global Function
+          const measuredSize = globalThis.__measureNode(shadowNode);
+          Alert.alert('Measured Size', JSON.stringify(measuredSize, null, 2));
         }}
       />
     </View>
