@@ -1,81 +1,46 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  processColor,
-  Button,
-  TextInput,
-  Alert,
-  ScrollView,
-  useWindowDimensions,
-  Modal,
-  Text,
-} from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, processColor, Button } from 'react-native';
 import { multiply } from 'react-native-shadow-nodes-experiments';
+import { runOnUI } from 'react-native-worklets';
 
 // @ts-ignore
 import { getNodeFromPublicInstance } from 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface';
 
 multiply(2, 3);
 
-const useSleepCycle = () => {
-  const isActiveRef = useRef(true);
-
-  useEffect(() => {
-    const sleep = (ms) => {
-      const start = Date.now();
-      while (Date.now() - start < ms) {
-        // Blocking sleep - this will freeze the main thread
-      }
-    };
-
-    const runCycle = async () => {
-      console.log('RUN');
-      while (isActiveRef.current) {
-        // Sleep for 50ms (blocking)
-        sleep(200);
-
-        // Do nothing for 50ms (non-blocking)
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-    };
-
-    runCycle();
-
-    // Cleanup function
-    return () => {
-      isActiveRef.current = false;
-    };
-  }, []);
-};
-
 export default function App() {
   const textRef = useRef(null);
-  const [text, setText] = useState('Hello World');
-  const size = useRef(100);
-  console.log('pink: ', processColor('pink'));
+  const pink = processColor('pink');
 
   const [isAnimating, setIsAnimating] = useState(false);
   const animationRef = useRef(null);
 
+  // @ts-ignore JSI Exposed global Function
+  const updateSize = globalThis.__updateSize;
+  const nativeFabricUIManager = globalThis.nativeFabricUIManager;
+
   const startAnimation = () => {
+    const shadowNode = getNodeFromPublicInstance(textRef.current);
     setIsAnimating(true);
+    runOnUI(() => {
+      globalThis.nativeFabricUIManager = nativeFabricUIManager;
+      globalThis.size = globalThis.size || 100;
+      const animate = () => {
+        updateSize(shadowNode, {
+          width: globalThis.size,
+          height: globalThis.size,
+          transform: [{ rotate: globalThis.size / 100 }],
+          backgroundColor: pink,
+        });
+        globalThis.size += 5;
 
-    const animate = () => {
-      const shadowNode = getNodeFromPublicInstance(textRef.current);
-      // @ts-ignore JSI Exposed global Function
-      globalThis.__updateSize(shadowNode, {
-        width: size.current,
-        height: size.current,
-      });
-      size.current += 0.1;
+        // Continue animation
+        requestAnimationFrame(animate);
+      };
 
-      // Continue animation
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    // Start the animation loop
-    animationRef.current = requestAnimationFrame(animate);
+      // Start the animation loop
+      requestAnimationFrame(animate);
+    })();
   };
 
   const stopAnimation = () => {
@@ -110,7 +75,6 @@ export default function App() {
           }}
         />
       </View>
-      <TextInput multiline defaultValue={text} onChangeText={setText} />
       <Button
         title={isAnimating ? 'Stop' : 'Animate'}
         onPress={() => {
@@ -121,32 +85,6 @@ export default function App() {
           }
         }}
       />
-      <Button
-        title="Animate single"
-        onPress={() => {
-          const shadowNode = getNodeFromPublicInstance(textRef.current);
-          // @ts-ignore JSI Exposed global Function
-          globalThis.__updateSize(shadowNode, {
-            width: size.current,
-            height: size.current,
-          });
-          size.current += 1;
-        }}
-      />
-      <Modal visible={false}>
-        <View style={{ flex: 1, backgroundColor: 'orange' }}>
-          <Text>Hello</Text>
-        </View>
-        <View
-          style={{
-            position: 'absolute',
-            backgroundColor: 'red',
-            width: '100%',
-            height: 100,
-            bottom: 0,
-          }}
-        />
-      </Modal>
     </View>
   );
 }

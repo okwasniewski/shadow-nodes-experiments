@@ -13,6 +13,7 @@
 using namespace facebook;
 using namespace facebook::react;
 
+// Custom alias to store affected node
 using AffectedNodes = std::unordered_map<const ShadowNodeFamily*, std::unordered_set<int>>;
 
 using ShadowLeafUpdates = std::unordered_map<const ShadowNodeFamily*, folly::dynamic>;
@@ -89,6 +90,8 @@ RCT_EXPORT_MODULE()
     return result;
 }
 
+// Method to clone the shadow tree copied from Unistyles.
+// This was upstreamed by @bartlomiejbloniarz https://github.com/facebook/react-native/pull/50624
 ShadowNode::Unshared cloneShadowTree(const ShadowNode &shadowNode, ShadowLeafUpdates& updates, AffectedNodes& affectedNodes) {
     const auto family = &shadowNode.getFamily();
     const auto rawPropsIt = updates.find(family);
@@ -144,12 +147,6 @@ ShadowNode::Unshared cloneShadowTree(const ShadowNode &shadowNode, ShadowLeafUpd
     shadowNode.getState()
   });
   
-  // Do it with Layoutable Shadow Node.
-  
-//  if (const auto layoutableNode = std::dynamic_pointer_cast<YogaLayoutableShadowNode>(clone)) {
-//    layoutableNode->setSize({.width = 300, .height = 300});
-//  }
-  
   return clone;
 }
 
@@ -197,44 +194,35 @@ AffectedNodes findAffectedNodes(const RootShadowNode& rootNode, ShadowLeafUpdate
                         // Helper to retrieve shadow node from native state.
                         ShadowNode::Shared shadowNode = shadowNodeFromValue(runtime, arguments[0]);
                         
-                        auto style = arguments[1].getObject(runtime);
-                        
-                        auto width = style.getProperty(runtime, "width").getNumber();
-                        auto height = style.getProperty(runtime, "height").getNumber();
+                        // Convert passed props to folly::dynamic.
+                        auto follyDynamicProps = jsi::dynamicFromValue(runtime, arguments[1]);
                         
                         if (!shadowNode) {
                             throw jsi::JSError(runtime, "Invalid shadow node");
                         }
                         
-                        // Possible improvement: retrieve only this shadow tree not all of them.
+                        // Get current component surface id.
                         auto componentSurfaceId = shadowNode->getSurfaceId();
                         
                         // Retrieve the registry of all shadow trees.
                         auto &shadowTreeRegistry = UIManagerBinding::getBinding(runtime)->getUIManager().getShadowTreeRegistry();
                         
                         // Visit just one surface id.
-                        shadowTreeRegistry.visit(componentSurfaceId, [&shadowNode, width, height](const ShadowTree& shadowTree) {
+                        shadowTreeRegistry.visit(componentSurfaceId, [&shadowNode, &follyDynamicProps](const ShadowTree& shadowTree) {
+                          // Retrieve root node of current revision.
+                          // Revisions represent versions of the tree (new commit == new revision).
                           auto rootNode = shadowTree.getCurrentRevision().rootShadowNode;
                           
+                          // Create a new leaf update, which is a std::unordered_map (ShadowNodeFamily: NewProps as folly dynamic)
+                          ShadowLeafUpdates updates = {{&shadowNode->getFamily(), follyDynamicProps}};
                           
-                          ShadowLeafUpdates updates = {};
-                          
-                          
-//                          updates[&shadowNode->getFamily()] = folly::dynamic::object
-//                          ("backgroundColor", 4294951115)("width", width)("height", height);
-                          updates[&shadowNode->getFamily()] = folly::dynamic::object
-                          ("backgroundColor", 4294951115)("transform", folly::dynamic::array(
-                                                                                             folly::dynamic::object("scale", width),
-                                                                                             folly::dynamic::object("rotate", width)
-                                                                                             ));
-//                          
-                          
+                          // Create a transaction that clones returns a new tree (after update).
                           auto transaction = [&updates](const RootShadowNode& oldRootShadowNode) {
-                            
+                            // Find affected nodes (current one up and all its ancestors).
                             auto affectedNodes = findAffectedNodes(oldRootShadowNode, updates);
                             
-
-                            return  std::static_pointer_cast<RootShadowNode>(cloneShadowTree(
+                            // Return a clone of the tree to commit.
+                            return std::static_pointer_cast<RootShadowNode>(cloneShadowTree(
                                 oldRootShadowNode,
                                 updates,
                                 affectedNodes
