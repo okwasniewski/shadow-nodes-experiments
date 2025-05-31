@@ -1,28 +1,8 @@
-# react-native-shadow-nodes-experiments
+# My experiments with the Shadow Tree 🌲
 
-Shadow Nodes Experiments
+This repo contains my research on cloning the shadow tree.
 
-## Installation
-
-```sh
-npm install react-native-shadow-nodes-experiments
-```
-
-## Usage
-
-
-```js
-import { multiply } from 'react-native-shadow-nodes-experiments';
-
-// ...
-
-const result = multiply(3, 7);
-```
-
-
-## Contributing
-
-See the [contributing guide](CONTRIBUTING.md) to learn how to contribute to the repository and the development workflow.
+⚠️ This package is not intended to be used!
 
 ## License
 
